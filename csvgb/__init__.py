@@ -3,11 +3,9 @@ from pprint import pformat
 import traceback
 import functools
 from copy import copy
-from csvu import isnum, isstr, isna as isna_, K_NAs as K_NAs_
+from csvu import isnum, isstr
 import csvu
-
-
-
+from itertools import chain
 
 
 
@@ -20,9 +18,9 @@ K_EXEMPT_UPPER = K_EXEMPT.upper()
 K_RANSOMED = 'Ransomed'
 K_RANSOMED_UPPER = K_RANSOMED.upper()
 
-K_NAs = copy(K_NAs_)
+K_NAs = copy(csvu.K_NAs)
 
-K_NAs.extend([K_MISSED, K_RANSOMED])
+K_NAs.extend([K_MISSED_UPPER, K_RANSOMED_UPPER])
 
 def isexempt(x):
     if isstr(x):
@@ -43,8 +41,11 @@ def isransomed(x):
 
 
 
+isna = functools.partial(csvu.isna, K=K_NAs)
 
-isna = functools.partial(isna_, K=K_NAs)
+drop0  = functools.partial(csvu.drop0,  isna=isna)
+equal0 = functools.partial(csvu.equal0, isna=isna)
+inner0 = functools.partial(csvu.inner0, isna=isna)
 
 def _fix(f):
     def g(x):
@@ -63,7 +64,7 @@ def _fix(f):
         return f(x, isna=isna)
     return g
 
-CSVU_IMPORTS_ISNA = [
+CSVU_IMPORTS_TO_FIX = [
         'toint',
         'tofloat',
         'tonnint',
@@ -71,19 +72,83 @@ CSVU_IMPORTS_ISNA = [
         'tozero',
         'sum0',
         'mean0',
-        'drop0',
         'max0',
         'min0',
-        'equal0',
-        'inner0',
     ]
 
-for i in CSVU_IMPORTS_ISNA:
+for i in CSVU_IMPORTS_TO_FIX:
     f = getattr(csvu, i, None)
     g = _fix(f)
     globals()[i] = g
 
-del i
-del f
-del g
+
+
+K_EXAM_N     = 4
+K_HOMEWORK_N = 13
+K_QUIZ_N     = 13
+K_THQ_N      = 13
+
+K_EXAM_ALL     = ['exam_{:02d}'.format    (m+1) for m in xrange(K_EXAM_N)]
+K_HOMEWORK_ALL = ['homework_{:02d}'.format(m+1) for m in xrange(K_HOMEWORK_N)]
+K_QUIZ_ALL     = ['quiz_{:02d}'.format    (m+1) for m in xrange(K_QUIZ_N)]
+K_THQ_ALL      = ['thq_{:02d}'.format     (m+1) for m in xrange(K_THQ_N)]
+
+def exam_g():
+    s = 'exam'
+    for m in range(K_EXAM_N):
+        s_m = '{}_{:02d}'.format(s, m + 1)
+        yield s_m
+        for n in range(12):
+            yield '{}_{:02d}'.format(s_m, n + 1)
+        for n in ['max', 'min', 'penalty', 'override',]:
+            yield '{}_{}'.format(s_m, n)
+
+def homework_g():
+    s = 'homework'
+    for m in range(K_HOMEWORK_N):
+        s_m = '{}_{:02d}'.format(s, m + 1)
+        yield s_m
+        for n in ['penalty', 'override',]:
+            yield '{}_{}'.format(s_m, n)
+    for m in ['grade', 'grade_min', 'grade_max', 'misses_pct', 'misses_count',]:
+        yield '{}_{}'.format(s, m)
+
+def quiz_g():
+    s = 'quiz'
+    for m in range(K_QUIZ_N):
+        s_m = '{}_{:02d}'.format(s, m + 1)
+        yield s_m
+        for n in range(3):
+            yield '{}_{:02d}'.format(s_m, n + 1)
+        for n in ['penalty', 'override',]:
+            yield '{}_{}'.format(s_m, n)
+    for m in ['grade', 'grade_min', 'grade_max', 'misses_pct', 'misses_count',]:
+        yield '{}_{}'.format(s, m)
+
+def thq_g():
+    s = 'thq'
+    for m in range(K_THQ_N):
+        s_m = '{}_{:02d}'.format(s, m + 1)
+        yield s_m
+        for n in range(3):
+            yield '{}_q{}'.format(s_m, n + 1)
+        for n in ['penalty', 'override',]:
+            yield '{}_{}'.format(s_m, n)
+    for m in ['grade', 'grade_min', 'grade_max', 'misses_pct', 'misses_count',]:
+        yield '{}_{}'.format(s, m)
+
+def course_g():
+    s = 'course'
+    for m in ['misses', 'misses_count', 'misses_pct', 'participation']:
+        s_m = '{}_{}'.format(s, m)
+        yield s_m
+    s = 'course_grade'
+    yield s
+    for m in ['max', 'min', 'midterm', 'penultimate']:
+        s_m = '{}_{}'.format(s, m)
+        yield s_m
+
+def all_g():
+    return chain(course_g(), exam_g(), homework_g(), quiz_g(), thq_g())
+
 
