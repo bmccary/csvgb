@@ -1,4 +1,5 @@
 
+from functools import partial
 from itertools import izip
 
 from csvgb import (
@@ -9,6 +10,7 @@ from csvgb import (
         isransomed,
         sum0,
         drop0,
+        inner0,
         mean0,
         K_RANSOMED,
         K_MISSED,
@@ -18,105 +20,60 @@ from csvgb import (
         K_THQ_N,
     )
 
-def _exam_XX_f(m):
-    s_m   = 'exam_{:02d}'.format(m)
+def sum_XX_YY(XX, YY, N, s_m_n_f='{}_{:02d}'):
+    s_m   = '{}_{:02d}'.format(XX, YY)
     s_m_o = '{}_override'.format(s_m)
     s_m_p = '{}_penalty'.format(s_m)
     s_m_r = '{}_ransom'.format(s_m)
-    s_m_n = ['{}_{:02d}'.format(s_m, n + 1) for n in xrange(12)]
-    def f(row, K):
+    s_m_n = [s_m_n_f.format(s_m, n + 1) for n in xrange(N)]
+
+    def f(row, ALL=[]):
+
         r = row.get(s_m_r)
         if not isna(r):
             return K_RANSOMED
+
         o = row.get(s_m_o)
         if not isna(o):
             return o
+
         v = sum0([row.get(k) for k in s_m_n])
         if isna(v):
-            if s_m in K:
-                return K_MISSED
+            if s_m in ALL:
+                v = K_MISSED
             return v
-        p = row.get(s_m_p)
-        if isnum(p):
-            v = max(v - p, 0)
-        return v
-    return s_m, f
 
-def _quiz_XX_f(m):
-    s_m   = 'quiz_{:02d}'.format(m)
-    s_m_o = '{}_override'.format(s_m)
-    s_m_p = '{}_penalty'.format(s_m)
-    s_m_r = '{}_ransom'.format(s_m)
-    s_m_n = ['{}_{:02d}'.format(s_m, n + 1) for n in xrange(3)]
-    def f(row, K):
-        r = row.get(s_m_r)
-        if not isna(r):
-            return K_RANSOMED
-        o = row.get(s_m_o)
-        if not isna(o):
-            return o
-        v = sum0([row[k] for k in s_m_n])
-        if isna(v):
-            if s_m in K:
-                return K_MISSED
-            return v
         p = row.get(s_m_p)
         if isnum(p):
             v = max(v - p, 0)
-        return v
-    return s_m, f
 
-def _thq_XX_f(m):
-    s_m   = 'thq_{:02d}'.format(m)
-    s_m_o = '{}_override'.format(s_m)
-    s_m_p = '{}_penalty'.format(s_m)
-    s_m_r = '{}_ransom'.format(s_m)
-    s_m_n = ['{}_q{}'.format(s_m, n + 1) for n in xrange(3)]
-    def f(row, K):
-        r = row.get(s_m_r)
-        if not isna(r):
-            return K_RANSOMED
-        o = row.get(s_m_o)
-        if not isna(o):
-            return o
-        v = sum0([row[k] for k in s_m_n])
-        if isna(v):
-            if s_m in K:
-                return K_MISSED
-            return v
-        p = row.get(s_m_p)
-        if isnum(p):
-            v = max(v - p, 0)
         return v
+
     return s_m, f
 
 for m in xrange(K_EXAM_N):
-    s_m, f = _exam_XX_f(m + 1)
+    s_m, f = sum_XX_YY('exam', m + 1, 12)
     globals()[s_m] = f
 
 for m in xrange(K_QUIZ_N):
-    s_m, f = _quiz_XX_f(m + 1)
+    s_m, f = sum_XX_YY('quiz', m + 1, 3)
     globals()[s_m] = f
 
 for m in xrange(K_THQ_N):
-    s_m, f = _thq_XX_f(m + 1)
+    s_m, f = sum_XX_YY('thq', m + 1, 3, s_m_n_f='{}_q{}')
     globals()[s_m] = f
 
-def X_all(row, K): return [row[k] for k in K if not isexempt(row[k])]
+def X_all(row, ALL): return [row[k] for k in ALL if not isexempt(row[k])]
 
-def homework_grade(row, K, D): return mean0(drop0(X_all(row, K), D))
+def X_grade(row, ALL, DROPS, DENOM):
+    m = mean0(drop0(X_all(row, ALL), DROPS))
+    if not isnum(m):
+        return 'None'
+    return m/DENOM*100.0
 
-def quiz_grade(row, K, D): 
-    m = mean0(drop0(X_all(row, K), D))
-    if isna(m):
-        return m
-    return m/30.0*100.0
-
-def thq_grade(row, K, D): 
-    m = mean0(drop0(X_all(row, K), D))
-    if isna(m):
-        return m
-    return m/30.0*100.0
+homework_grade = partial(X_grade, DENOM=100.0)
+quiz_grade = partial(X_grade, DENOM=30.0)
+thq_grade = partial(X_grade, DENOM=30.0)
 
 def X_misses_g(row, K): return (k for k in K if ismissed(row[k]))
 

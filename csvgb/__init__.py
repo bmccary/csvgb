@@ -1,12 +1,11 @@
 
 from pprint import pformat
 import traceback
-import functools
+from functools import partial
 from copy import copy
-from csvu import isnum, isstr
+from csvu import *
 import csvu
 from itertools import chain
-
 
 
 K_MISSED = 'Missed'
@@ -18,9 +17,14 @@ K_EXEMPT_UPPER = K_EXEMPT.upper()
 K_RANSOMED = 'Ransomed'
 K_RANSOMED_UPPER = K_RANSOMED.upper()
 
+K_NEEDS_GRADING = 'Needs Grading'
+K_NEEDS_GRADING_UPPER = K_NEEDS_GRADING.upper()
+
 K_NAs = copy(csvu.K_NAs)
 
-K_NAs.extend([K_MISSED_UPPER, K_RANSOMED_UPPER])
+K_NAs.extend([K_EXEMPT_UPPER, K_MISSED_UPPER, K_RANSOMED_UPPER, K_NEEDS_GRADING_UPPER])
+
+isna = partial(csvu.isna, K=K_NAs)
 
 def isexempt(x):
     if isstr(x):
@@ -32,20 +36,22 @@ def ismissed(x):
         return x.strip().upper() == K_MISSED_UPPER
     return False
 
+def isneedsgrading(x):
+    if isstr(x):
+        return x.strip().upper() == K_NEEDS_GRADING_UPPER
+    return False
+
 def isransomed(x):
     if isstr(x):
         return x.strip().upper() == K_RANSOMED_UPPER
     return False
 
-
-
-
-
-isna = functools.partial(csvu.isna, K=K_NAs)
-
-drop0  = functools.partial(csvu.drop0,  isna=isna)
-equal0 = functools.partial(csvu.equal0, isna=isna)
-inner0 = functools.partial(csvu.inner0, isna=isna)
+def isint(x):
+    if isinstance(x, int):
+        return True
+    if isinstance(x, float) and x.is_integer():
+        return True
+    return False
 
 def _fix(f):
     def g(x):
@@ -53,6 +59,8 @@ def _fix(f):
             return K_EXEMPT
         if ismissed(x):
             return K_MISSED
+        if isneedsgrading(x):
+            return K_NEEDS_GRADING
         if isna(x):
             if x in ['', 'NA', None, []]:
                 return x
@@ -74,14 +82,15 @@ CSVU_IMPORTS_TO_FIX = [
         'mean0',
         'max0',
         'min0',
+        'drop0',
+        'equal0',
+        'inner0',
     ]
 
 for i in CSVU_IMPORTS_TO_FIX:
     f = getattr(csvu, i, None)
-    g = _fix(f)
+    g = partial(f, isna=isna)
     globals()[i] = g
-
-
 
 K_EXAM_N     = 4
 K_HOMEWORK_N = 13
